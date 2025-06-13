@@ -1,3 +1,26 @@
 # gpubacktest
 
-little demo to see if you can backtest on a gpu
+some people think it's impossible to backtest on a gpu...  
+but it's not.
+
+
+### Setup
+```bash
+python3 -m venv venv3.12
+source venv3.12/bin/activate
+python3 -m pip install -r requirements.txt
+```
+
+If you have vscode/cursor you can also run this as a notebook (recommended).
+
+I built this so that it should work out of the box. We've downloaded the kaggle
+dataset into the repository and truncated and compressed it so it's at a size
+that's friendly for git.
+
+
+### Notes
+
+- **Bitcoin Historical Data**  
+  A comprehensive daily OHLC dataset from Kaggle.  
+  🔗 https://www.kaggle.com/datasets/mczielinski/bitcoin-historical-data
+
