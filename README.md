@@ -1,7 +1,7 @@
 # gpubacktest
 
-some people think it's impossible to backtest on a gpu...  
-but it's not.
+some people think it's not possible to backtest on a gpu because the problem isn't parallelizable...  
+but that's not true.
 
 
 ### Setup
