@@ -12,9 +12,9 @@ R_t = P_t / P_{t-1} - 1
 ```
 
 **Compounding over _n_ periods**  
-\[
+```math
 \text{Total\_return} = (1 + R_1)\;\times\;(1 + R_2)\;\times\;\cdots\;\times\;(1 + R_n)\;-\;1
-\]
+```
 
 **Code Example**  
 ```python
