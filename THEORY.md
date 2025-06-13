@@ -43,6 +43,7 @@ r_t = np.log(P_t / P_{t-1})
 ```
 
 **Additivity property**  
+$$
 \[
 \sum_{t=1}^n r_t 
 \;=\;\ln\!\bigl(P_n/P_0\bigr)
@@ -50,6 +51,7 @@ r_t = np.log(P_t / P_{t-1})
 \exp\!\Bigl(\sum_{t=1}^n r_t\Bigr)\;-\;1
 \;=\;\frac{P_n}{P_0}\;-\;1
 \]
+$$
 
 **Code Example**  
 ```python
