@@ -28,6 +28,19 @@ sudo apt-get update
 sudo apt-get install cuda-toolkit-12-4
 ```
 
+
+If you're at all like me, you'll want to be able to play with this from your laptop while your heavy desktop does all the GPU stuff.
+
+```bash
+# start ssh on your host
+sudo apt install openssh-server
+sudo systemctl restart ssh
+```
+On local, install the Remote-SSH extension pack in 
+vscode/cursor. Connect and you should be able to start up a jupyter IPython kernel just like normal. This is a really amazing workflow.
+
+
+
 ### Notes
 
 - **Bitcoin Historical Data**  
