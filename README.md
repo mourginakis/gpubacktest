@@ -1,6 +1,6 @@
 # gpubacktest
 
-some people think it's not possible to backtest on a gpu because the problem isn't parallelizable...  
+some people think it's impossible to backtest on a gpu because the problem isn't parallelizable...  
 but that's not true.
 
 
@@ -13,9 +13,7 @@ python3 -m pip install -r requirements.txt
 
 If you have vscode/cursor you can also run this as a notebook (recommended).
 
-I built this so that it should work out of the box. We've downloaded the kaggle
-dataset into the repository and truncated and compressed it so it's at a size
-that's friendly for git.
+I built this so that it should work out of the box. We've downloaded the kaggle dataset into the repository and truncated and compressed it so it's at a size that's friendly for git.
 
 
 ### Notes
