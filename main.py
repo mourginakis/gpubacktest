@@ -210,3 +210,37 @@ def backtest_naive(df: pd.DataFrame) -> pd.DataFrame:
 results_naive = backtest_naive(df1)
 print(f"Naive Backtest Final Equity: {results_naive['equity'].iloc[-1]:.2f}")
 
+
+
+#%% ==================== Vectorized Backtest ====================
+
+def backtest_vectorized(df: pd.DataFrame) -> pd.DataFrame:
+    pass
+
+
+#%% ==================== SMA Cross (Vectorized) ====================
+
+# generate SMA for both periods
+df['sma_2d']   = df['Close'].rolling(window='2d').mean()
+df['sma_10d']  = df['Close'].rolling(window='10d').mean()
+df["return"]   = df["Close"].pct_change()
+df["return"]   = df["return"].fillna(0)
+
+df1 = df.loc["2017-02-01":].copy()
+
+# generate signals (1=long, 0=flat) based on crossover
+df1['signal'] = (df1['sma_2d'] > df1['sma_10d']).astype(int)
+# align to avoid lookahead
+df1['position'] = df1['signal'].shift(1).fillna(0)
+# apply transaction costs per trade
+fee_rate = 0.001  # 0.1% commission per trade
+df1['trade'] = df1['position'].diff().abs()
+# compute strategy returns net of fees
+df1['strategy_return_sma'] = df1['position'] * df1['return']
+df1['strategy_return_sma'] = df1['strategy_return_sma'] - df1['trade'] * fee_rate
+# compute cumulative returns
+df1['cum_return_sma'] = (1 + df1['strategy_return_sma']).cumprod() - 1
+print(f"SMA Crossover Total Return (fast=2D, slow=10D): {df1['cum_return_sma'].iloc[-1]:.2%}")
+
+
+# %%
