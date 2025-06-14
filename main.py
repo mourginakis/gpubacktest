@@ -174,8 +174,10 @@ def backtest_naive(df: pd.DataFrame) -> pd.DataFrame:
     # ---------- iterate over the df ----------
     for idx, row in df.iterrows():
 
-        if int(idx.timestamp() // 60 ) % 100_000 == 0:
-            print(f"Processing {idx}...")
+        verbose = False
+        if verbose:
+            if int(idx.timestamp() // 60 ) % 100_000 == 0:
+                print(f"Processing {idx}...")
 
         # ---------- snapshot _now ----------
         price_now     = row["Close"]
@@ -252,6 +254,24 @@ def backtest_vectorized(df: pd.DataFrame) -> pd.DataFrame:
     df["equity"]     = 100 * (1 + df["cum_return"])
 
     return df
+
+#%% ==================== Backtest cudf ====================
+
+def backtest_cudf(df: cudf.DataFrame) -> cudf.DataFrame:
+    """vectorised back test, using cudf (GPU)"""
+    xfee = 0.0                       # fees disabled for now
+    # per-bar P&L
+    df["strategy_returns"] = df["target"].shift(1).fillna(0) * df["returns"]
+
+    # trades (0 → 1 or 1 → 0) for future fee logic
+    # df["trade"] = df["target"].diff().abs().fillna(0)
+    # df["strategy_returns"] -= df["trade"] * xfee
+
+    # equity curve (start with $100)
+    df["cum_return"] = (1 + df["strategy_returns"]).cumprod() - 1
+    df["equity"]     = 100 * (1 + df["cum_return"])
+
+    return df
     
 
 #%% ==================== SMA Backtest ====================
@@ -285,7 +305,11 @@ print(f"Vectorized Backtest Final Equity: {results_vectorized['equity'].iloc[-1]
 results_naive = backtest_naive(df1)
 print(f"Naive Backtest Final Equity: {results_naive['equity'].iloc[-1]:.2f}")
 
+df2 = cudf.DataFrame.from_pandas(df1)
+results_cudf = backtest_cudf(df2)
+print(f"cuDF Backtest Final Equity: {results_cudf['equity'].iloc[-1]:.2f}")
+
 # both should equal: 5865.51 with 0.000 fee.
 
 
-#%% 
+#%% ==================== Benchmark Speed ====================
