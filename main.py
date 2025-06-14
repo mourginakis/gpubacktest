@@ -151,36 +151,16 @@ plot_returns(df1, "Buy-and-Hold (Log Returns)")
 
 
 
-#%% ==================== SMA Cross ===================
-
-# ultra-readable naive python loop
-# source of truth for calulation correctness
-# baseline for performance comparison
-
-# TODO: switch to pure integer window sizes?
-
-df["sma_2d"]  = df["Close"].rolling(window='2d').mean()
-df["sma_10d"] = df["Close"].rolling(window='10d').mean()
-
-# trim the first 30 days to assure smas are fully populated
-df1 = df.loc["2017-02-01":].copy()
-
-# calculate the position target (this is the SMA cross)
-# CRITICAL: shift signal down by 1 to eliminate lookahead bias
-df1["target"] = (df1['sma_2d'] > df1['sma_10d']).astype(int)
-df1['signal'] = df1['target'].diff().shift(1) # 1 or -1 for buy/sell signal
-
-# TODO: fill NaN values in signal with 0 (no action)
-df1.head()
-
-
-#%% ===================== Naive Backtest ====================
+#%% ===================== Backtest Naive ====================
 
 def backtest_naive(df: pd.DataFrame) -> pd.DataFrame:
     """naive backtest using an iterative loop"""
+    # ultra-readable naive python loop
+    # source of truth for calulation correctness
+    # baseline for performance comparison
 
     # ---------- init portfolio (0.1% trading fee) ----------
-    xfee       = 0.001
+    xfee       = 0.000
     cash0      = 100
     cash       = [ cash0]
     size       = [   0.0]
@@ -255,41 +235,57 @@ def backtest_naive(df: pd.DataFrame) -> pd.DataFrame:
     return results
 
 
-# run, print
+#%% ==================== Backtest Vectorized ====================
+
+def backtest_vectorized(df: pd.DataFrame) -> pd.DataFrame:
+    """vectorised back test, using pandas (CPU)"""
+    xfee = 0.0                       # fees disabled for now
+    # per-bar P&L
+    df["strategy_returns"] = df["target"].shift(1).fillna(0) * df["returns"]
+
+    # trades (0 → 1 or 1 → 0) for future fee logic
+    # df["trade"] = df["target"].diff().abs().fillna(0)
+    # df["strategy_returns"] -= df["trade"] * xfee
+
+    # equity curve (start with $100)
+    df["cum_return"] = (1 + df["strategy_returns"]).cumprod() - 1
+    df["equity"]     = 100 * (1 + df["cum_return"])
+
+    return df
+    
+
+#%% ==================== SMA Backtest ====================
+
+# ---------- prepare data ----------
+# TODO: switch to pure integer window sizes?
+df["sma_2d"]  = df["Close"].rolling(window='2d').mean()
+df["sma_10d"] = df["Close"].rolling(window='10d').mean()
+df["returns"] = df["Close"].pct_change()
+
+# ---------- trim the NaN values ----------
+# trim the first 30 days to assure smas are fully 
+# populated, and no NaNs
+df1 = df.loc["2017-02-01":].copy()
+
+# ---------- run the strategy ----------
+# `target` is 1 for long, 0 for flat, and denotes the desired position
+# `signal` is 1 for buy, -1 for sell, and denotes the action needed
+# CRITICAL: shift down by 1 to eliminate lookahead bias
+df1["target"] = (df1['sma_2d'] > df1['sma_10d']).astype(int).shift(1).fillna(0)
+df1["signal"] = df1["target"].diff().fillna(0)
+
+df1.head()
+
+
+#%% ==================== Run the backtests ====================
+
+results_vectorized = backtest_vectorized(df1)
+print(f"Vectorized Backtest Final Equity: {results_vectorized['equity'].iloc[-1]:.2f}")
+
 results_naive = backtest_naive(df1)
 print(f"Naive Backtest Final Equity: {results_naive['equity'].iloc[-1]:.2f}")
 
+# both should equal: 5865.51 with 0.000 fee.
 
 
-#%% ==================== Vectorized Backtest ====================
-
-def backtest_vectorized(df: pd.DataFrame) -> pd.DataFrame:
-    pass
-
-
-#%% ==================== SMA Cross (Vectorized) ====================
-
-# generate SMA for both periods
-df['sma_2d']   = df['Close'].rolling(window='2d').mean()
-df['sma_10d']  = df['Close'].rolling(window='10d').mean()
-df["return"]   = df["Close"].pct_change()
-df["return"]   = df["return"].fillna(0)
-
-df1 = df.loc["2017-02-01":].copy()
-
-# generate signals (1=long, 0=flat) based on crossover
-df1['signal'] = (df1['sma_2d'] > df1['sma_10d']).astype(int)
-# align to avoid lookahead
-df1['position'] = df1['signal'].shift(1).fillna(0)
-# apply transaction costs per trade
-fee_rate = 0.000  # 0.1% commission per trade
-df1['trade'] = df1['position'].diff().abs()
-# compute strategy returns net of fees
-df1['strategy_return_sma'] = df1['position'].shift(1).fillna(0) * df1['return']
-df1['strategy_return_sma'] = df1['strategy_return_sma'] - df1['trade'] * fee_rate
-# compute cumulative returns
-df1['cum_return_sma'] = (1 + df1['strategy_return_sma']).cumprod() - 1
-print(f"SMA Crossover Total Return (fast=2D, slow=10D): {df1['cum_return_sma'].iloc[-1]:.2%}")
-
-
-# %%
+#%% 
