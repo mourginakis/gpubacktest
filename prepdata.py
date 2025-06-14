@@ -1,6 +1,12 @@
 #%% ==================== Imports ====================
 import pandas as pd
 
+# This script will prepare the Bitcoin USD historical data 
+# from kaggle to be cleaned, validated, compressed, and exported
+# to disk, so it can be committed to the repository. This file should
+# only ever need be run once, so anyone playing with this repo can
+# ignore it. This file is just for the initial data preparation.
+
 
 #%% ==================== Load Data ====================
 # downloaded data from kaggle (~300mb)
