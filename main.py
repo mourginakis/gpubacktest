@@ -55,35 +55,109 @@ print(f"GPU: 1000 runs took {gpu_time}, average {gpu_time/1000} seconds per run"
 
 #%% ==================== Buy-and-Hold Backtest ====================
 
+# Here, we demonstrate multiple identical long-btc backtests using different 
+# methods of computation. This is a great introduction to gpu backtesting 
+# because there is no complex fee logic, and the general idea for 
+# the computational speedup is easy to understand.
+#
+# Note: in pandas, pct_change is the same thing as division by a shifted value.
+# to put it explicitly:
+# df["return1"] = df["Close"].pct_change()
+# df["return1"] = df["Close"] / df["Close"].shift(1) - 1
+# We will avoid using pct_change to avoid confusion, 
+# preferring to be explicit.
+#
 
-# ---------- example using pct_change ----------
-df1 = df.copy()
-df1["return"] = df["Close"].pct_change()
-df1["return"] = df1["return"].fillna(0)
-df1["return_cum"] = (1 + df1["return"]).cumprod() - 1
-print(f"Buy-and-Hold Total return: {df1['return_cum'].iloc[-1]:.2%}")
+df1  = df.copy()
+gdf1 = gdf.copy()
+
+# 1. simple iteration loop
+def long_btc_naive():
+    returns = df1["Close"] / df1["Close"].shift(1) - 1
+    returns = returns.fillna(0)
+    wealth = 1.0
+    for R in returns:
+        wealth *= (1 + R)
+    return wealth - 1
+
+print(f"Buy-and-Hold Total return (naive loop): {long_btc_naive():.2%}")
+
+# 2. using vectorized pandas (cumprod)
+def long_btc_vectorized():
+    returns = df1["Close"] / df1["Close"].shift(1) - 1
+    returns = returns.fillna(0)
+    return_cum = (1 + returns).cumprod() - 1
+    return return_cum.iloc[-1]
+
+print(f"Buy-and-Hold Total return (vectorized): {long_btc_vectorized():.2%}")
+
+# 3. using vectorized pandas (log->cumsum)
+def long_btc_vectorized_log():
+    log_returns = np.log(df1["Close"]).diff()
+    log_returns = log_returns.fillna(0)
+    return_cum = np.exp(log_returns.cumsum()) - 1
+    return return_cum.iloc[-1]
+print(f"Buy-and-Hold Total return (log returns): {long_btc_vectorized_log():.2%}")
+
+# 4. using vectorized cudf (cumsum) 
+def long_btc_cudf():
+    returns = gdf1["Close"].pct_change().fillna(0)
+    wealth  = (1 + returns).cumprod()
+    return float(wealth.iloc[-1] - 1)
+
+# 5 . using cupy (log-diff, cumsum)
+def long_btc_cupy():
+    # here we stay entirely in cupy so there's no cudf overhead
+    # which makes it like 2x as fast
+    # 1. pull the Series onto the GPU as a contiguous CuPy array
+    # 2. log-diff (fast, numerically stable)
+    # 3. cumulative wealth
+    px = gdf1["Close"].values          # cupy.ndarray
+    log_ret = cupy.diff(cupy.log(px), prepend=cupy.log(px[0]))
+    wealth = cupy.exp(cupy.cumsum(log_ret))
+    return float(wealth[-1] - 1)
 
 
-# ---------- example using division ----------
-# simple return, exactly equivalent to pct_change
-df1 = df.copy()
-df1["return"] = df1["Close"] / df1["Close"].shift(1) - 1
-df1["return"] = df1["return"].fillna(0)
-df1["return_cum"] = (1 + df1["return"]).cumprod() - 1
-print(f"Buy-and-Hold Total return: {df1['return_cum'].iloc[-1]:.2%}")
+print(f"Buy-and-Hold Total return (cudf): {long_btc_cudf():.2%}")
 
 
-# ---------- example using diff (log return) ----------
-df1 = df.copy()
-df1["log_return"]      = np.log(df["Close"]).diff()
-df1["log_return"]      = df1["log_return"].fillna(0)
-df1["log_return_cum"]  = df1["log_return"].cumsum()
-df1["return_cum"]      = np.exp(df1["log_return_cum"]) - 1
-print(f"Buy-and-Hold Total return (via log returns): {df1['return_cum'].iloc[-1]:.2%}")
+# what's really cool, is that if you don't need any of the intermediate
+# results, you can completely skip the cumsum, and just calculate the
+# sum of the log returns, and then exponentiate it to bring it back out
+# of log space.
+
+def long_btc_ultimate():
+    px = gdf1["Close"].values
+    log_ret = cupy.diff(cupy.log(px), prepend=cupy.log(px[0]))  # first diff = 0
+    total_log_r = cupy.sum(log_ret)                             # Σ log-returns
+    return float(cupy.exp(total_log_r) - 1)                     # (P_T/P_0) – 1
 
 
-# log return allows you to do cumulative add, which is 
-# parallelized easily on GPU
+print(f"Buy-and-Hold Total return (ultimate): {long_btc_ultimate():.2%}")
+
+
+# assert they are all equal
+assert abs(long_btc_naive()   - long_btc_vectorized()    ) < 0.01
+assert abs(long_btc_naive()   - long_btc_vectorized_log()) < 0.01
+assert abs(long_btc_naive()   - long_btc_cudf()          ) < 0.01
+
+long_btc_naive_time      = timeit.timeit(long_btc_naive, number=100)
+long_btc_vectorized_time = timeit.timeit(long_btc_vectorized, number=1_000)
+long_btc_cudf_time       = timeit.timeit(long_btc_cudf, number=1_000)
+long_btc_cupy_time       = timeit.timeit(long_btc_cupy, number=1_000)
+long_btc_ultimate_time   = timeit.timeit(long_btc_ultimate, number=1_000)
+print(f"Naive loop: 100 runs took {long_btc_naive_time}, "
+      f"average {long_btc_naive_time/100} seconds per run")
+print(f"Vectorized pandas: 1000 runs took {long_btc_vectorized_time}, "
+      f"average {long_btc_vectorized_time/1000} seconds per run")
+print(f"Vectorized cudf: 1000 runs took {long_btc_cudf_time}, "
+      f"average {long_btc_cudf_time/1000} seconds per run")
+print(f"Long-btc cupy: 1000 runs took {long_btc_cupy_time}, "
+      f"average {long_btc_cupy_time/1000} seconds per run")
+print(f"Ultimate cupy: 1000 runs took {long_btc_ultimate_time}, "
+      f"average {long_btc_ultimate_time/1000} seconds per run")
+
+
 
 #%% ==================== Plotting ====================
 
