@@ -99,3 +99,114 @@ def plot_returns(df: pd.DataFrame, title: str):
     fig.show()
 
 plot_returns(df1, "Buy-and-Hold (Log Returns)")
+
+
+
+#%% ==================== SMA Cross ===================
+
+# ultra-readable naive python loop
+# source of truth for calulation correctness
+# baseline for performance comparison
+
+# TODO: switch to pure integer window sizes?
+
+df["sma_2d"]  = df["Close"].rolling(window='2d').mean()
+df["sma_10d"] = df["Close"].rolling(window='10d').mean()
+
+# trim the first 30 days to assure smas are fully populated
+df1 = df.loc["2017-02-01":].copy()
+
+# calculate the position target (this is the SMA cross)
+# CRITICAL: shift signal down by 1 to eliminate lookahead bias
+df1["target"] = (df1['sma_2d'] > df1['sma_10d']).astype(int)
+df1['signal'] = df1['target'].diff().shift(1) # 1 or -1 for buy/sell signal
+
+# TODO: fill NaN values in signal with 0 (no action)
+df1.head()
+
+
+#%% ===================== Naive Backtest ====================
+
+def backtest_naive(df: pd.DataFrame) -> pd.DataFrame:
+    """naive backtest using an iterative loop"""
+
+    # ---------- init portfolio (0.1% trading fee) ----------
+    xfee       = 0.001
+    cash0      = 100
+    cash       = [ cash0]
+    size       = [   0.0]
+    position   = [     0]
+    fees       = [   0.0]
+    equity     = [ cash0]
+    # position = 0
+    # n_trades = 0
+    # note: we probably don't need to store position
+
+    # ---------- iterate over the df ----------
+    for idx, row in df.iterrows():
+
+        if int(idx.timestamp() // 60 ) % 100_000 == 0:
+            print(f"Processing {idx}...")
+
+        # ---------- snapshot _now ----------
+        price_now     = row["Close"]
+        cash_now      = cash[-1]
+        size_now      = size[-1]
+        position_now  = position[-1]
+        equity_now    = equity[-1]
+
+        # CASE: buy signal -> buy the asset
+        if row["signal"] == 1 and position_now == 0:
+            size_delta     = cash_now / (price_now * (1 + xfee))
+            fee_paid       = size_delta * price_now * xfee
+            cash_final     = 0.0
+            size_final     = size_now + size_delta
+            position_final = 1
+            equity_final   = cash_final + size_final * price_now
+
+        # CASE: sell signal -> sell the asset
+        elif row["signal"] == -1 and position_now == 1:
+            fee_paid        = size_now * price_now * xfee
+            cash_final      = cash_now + size_now * price_now - fee_paid
+            size_final      = 0.0
+            position_final  = 0
+            equity_final    = cash_final + size_final * price_now
+
+        # CASE: hold signal -> do nothing
+        else:
+            fee_paid        = 0.0
+            cash_final      = cash_now
+            size_final      = size_now
+            position_final  = position_now
+            equity_final    = cash_final + size_final * price_now
+
+        # ---------- store results ----------
+        fees.append(fee_paid)
+        cash.append(cash_final)
+        size.append(size_final)
+        position.append(position_final)
+        equity.append(equity_final)
+
+    # ---------- create a new df with results ----------
+    # truncate the seed values
+    cash      = cash[1:]
+    size      = size[1:]
+    position  = position[1:]
+    equity    = equity[1:]
+
+    # TODO: calculate cumulative fees?
+
+    results = pd.DataFrame({
+        "cash": cash,
+        "size": size,
+        "position": position,
+        "equity": equity
+    }, index=df.index)
+
+    return results
+
+
+# run, print
+results_naive = backtest_naive(df1)
+print(f"Naive Backtest Final Equity: {results_naive['equity'].iloc[-1]:.2f}")
+
