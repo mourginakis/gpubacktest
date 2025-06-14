@@ -45,4 +45,15 @@ df2.to_csv("btc_usd.csv", index=False)
 df2.to_csv("btc_usd.csv.xz", index=False, compression="xz")
 
 
-# %%
+#%% =================== Hash Check ===================
+
+import hashlib
+from pathlib import Path
+
+xz_path = Path("btc_usd.csv.xz")
+cur_sha = hashlib.sha256(xz_path.read_bytes()).hexdigest()
+print("btc_usd.csv.xz SHA-256:\n", cur_sha)
+
+# Expected hash for btc_usd.csv.xz:
+# 8f5b9b153e2a8239df8390bc0ea7070fee54503a4e1476f370f26037b86b5fdb
+
