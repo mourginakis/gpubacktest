@@ -5,12 +5,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cudf, cupy, numpy as np, os
 
-# ---------- smoke test ----------
-print(f"cuDF version: {cudf.__version__}")
-print(f"GPU: {cupy.cuda.runtime.getDeviceProperties(0)['name'].decode()}")
-gdf = cudf.DataFrame({"x": cupy.arange(10)})
-print(gdf.sum())
+def gpu_smoke_test():
+    print(f"cuDF version: {cudf.__version__}")
+    print(f"GPU: {cupy.cuda.runtime.getDeviceProperties(0)['name'].decode()}")
+    gdf = cudf.DataFrame({"x": cupy.arange(10)})
+    assert gdf.sum().sum() == 45, "GPU smoke test failed"
+    print("GPU smoke test passed!")
 
+gpu_smoke_test()
 
 # %% ==================== Load Data ====================
 
