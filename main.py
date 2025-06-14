@@ -1,5 +1,5 @@
 #%% ==================== Imports ====================
-
+import timeit
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,33 +24,6 @@ df.index = pd.to_datetime(df.index, unit="s")
 # cudf does not support xz, so load from cpu dataframe
 gdf = cudf.DataFrame(df)
 gdf.info(memory_usage="deep")
-
-
-#%% ==================== Get GPU working ====================
-import timeit
-
-# you can do fp32 or fp64. fp32 doesnt seem to have much of 
-# a speedup because apparently we're memory bound?
-# fp64 is great because we don't sacrifice any accuracy
-
-df64  = df["Close"].astype(np.float64)
-gdf64 = gdf["Close"].astype(np.float64)
-
-def cpu_sum(): return df64.sum()
-def gpu_sum(): return gdf64.sum()
-cpu_result = cpu_sum()
-gpu_result = gpu_sum()
-
-assert abs(gpu_result - cpu_result) < 0.1, "GPU and CPU results do not match"
-
-print(f"CPU result: {cpu_result}")
-print(f"GPU result: {gpu_result}")
-
-cpu_time = timeit.timeit(cpu_sum, number=1_000)
-gpu_time = timeit.timeit(gpu_sum, number=1_000)
-
-print(f"CPU: 1000 runs took {cpu_time}, average {cpu_time/1000} seconds per run")
-print(f"GPU: 1000 runs took {gpu_time}, average {gpu_time/1000} seconds per run")
 
 
 #%% ==================== Buy-and-Hold Backtest ====================
@@ -307,10 +280,10 @@ df1['signal'] = (df1['sma_2d'] > df1['sma_10d']).astype(int)
 # align to avoid lookahead
 df1['position'] = df1['signal'].shift(1).fillna(0)
 # apply transaction costs per trade
-fee_rate = 0.001  # 0.1% commission per trade
+fee_rate = 0.000  # 0.1% commission per trade
 df1['trade'] = df1['position'].diff().abs()
 # compute strategy returns net of fees
-df1['strategy_return_sma'] = df1['position'] * df1['return']
+df1['strategy_return_sma'] = df1['position'].shift(1).fillna(0) * df1['return']
 df1['strategy_return_sma'] = df1['strategy_return_sma'] - df1['trade'] * fee_rate
 # compute cumulative returns
 df1['cum_return_sma'] = (1 + df1['strategy_return_sma']).cumprod() - 1
