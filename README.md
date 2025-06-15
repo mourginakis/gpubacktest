@@ -14,7 +14,7 @@ Yes, it's literally 10,000x faster than the naive CPU version.
 
 ### Setup
 ```bash
-python3 -m venv venv3.12
+python3.12 -m venv venv3.12
 source venv3.12/bin/activate
 python3 -m pip install -r requirements.txt
 ```
