@@ -334,6 +334,10 @@ print(f"cuDF Backtest Final Equity: {results_cudf['equity'].iloc[-1]:.2f}")
 #%% ==================== Benchmark Speed ====================
 
 
+# TODO: implement speed?
+# TODO: implement slippage?
+
+
 def benchmark_naive():
     backtest_naive(df1)
 
@@ -353,4 +357,6 @@ print(f"CPU multi-core Backtest: {vectorized_time/1_000} seconds per run")
 print(f"GPU Backtest:            {cudf_time/1_000}       seconds per run")
 
 
-# %%
+#%% ==================== Find a winning strategy? ====================
+
+# TODO: test across 10000s of strategies?
