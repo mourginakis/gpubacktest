@@ -344,11 +344,13 @@ def benchmark_cudf():
     backtest_cudf(df2)
 
 
-naive_time        = timeit.timeit(benchmark_naive, number=3)
-vectorized_time   = timeit.timeit(benchmark_vectorized, number=1_000)
-cudf_time         = timeit.timeit(benchmark_cudf, number=1_000)
+naive_time        = timeit(benchmark_naive, number=3)
+vectorized_time   = timeit(benchmark_vectorized, number=1_000)
+cudf_time         = timeit(benchmark_cudf, number=1_000)
 
 print(f"CPU Backtest (naive):    {naive_time/3}          seconds per run")
 print(f"CPU multi-core Backtest: {vectorized_time/1_000} seconds per run")
 print(f"GPU Backtest:            {cudf_time/1_000}       seconds per run")
 
+
+# %%
