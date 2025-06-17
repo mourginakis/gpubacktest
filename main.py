@@ -348,13 +348,22 @@ def benchmark_cudf():
     backtest_cudf(df2)
 
 
-naive_time        = timeit(benchmark_naive, number=3)
-vectorized_time   = timeit(benchmark_vectorized, number=1_000)
-cudf_time         = timeit(benchmark_cudf, number=1_000)
+naive_time        = timeit(benchmark_naive, number=3)           / 3
+vectorized_time   = timeit(benchmark_vectorized, number=1_000)  / 1_000
+cudf_time         = timeit(benchmark_cudf, number=1_000)        / 1_000
 
-print(f"CPU Backtest (naive):    {naive_time/3}          seconds per run")
-print(f"CPU multi-core Backtest: {vectorized_time/1_000} seconds per run")
-print(f"GPU Backtest:            {cudf_time/1_000}       seconds per run")
+
+print(f"CPU Backtest (naive):    {naive_time:.8f}          seconds per run")
+print(f"CPU multi-core Backtest: {vectorized_time:.8f} seconds per run")
+print(f"GPU Backtest:            {cudf_time:.8f}       seconds per run")
+print(f"Max speedup: {naive_time / cudf_time:.3f}x\n\n")
+
+
+# ------ Output (Ryzen 5 3600, RTX 3080Ti):
+# CPU Backtest (naive):    117.18413124  seconds per run
+# CPU multi-core Backtest: 0.05004053    seconds per run
+# GPU Backtest:            0.01131282    seconds per run
+# Max speedup: 10358.529x
 
 
 #%% ==================== Find a winning strategy? ====================
