@@ -4,9 +4,11 @@ A lot of people told me this was impossible to do, so building it was
 extremely vindicating. Now it's open source.
 
 ```bash
-CPU Backtest (naive):      115.7722482746661        seconds per run
-CPU Backtest (multi-core):   0.04902243487500527    seconds per run
-GPU Backtest:                0.011361166914997738   seconds per run
+# ------ Output (Ryzen 5 3600, RTX 3080Ti):
+# CPU Backtest (naive):    117.18413124  seconds per run
+# CPU multi-core Backtest: 0.05004053    seconds per run
+# GPU Backtest:            0.01131282    seconds per run
+# Max speedup: 10358.529x
 ```
 
 Yes, it's literally 10,000x faster than the naive CPU version.
