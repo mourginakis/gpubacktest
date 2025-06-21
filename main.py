@@ -17,16 +17,17 @@ smoke_test()
 
 
 # %% ==================== Load Data ====================
-# load in the compressed time series data for btc_usd
+# ---------- load btc_usd into memory ----------
 df = pd.read_csv("btc_usd.csv.xz", compression="xz")
-df.info(memory_usage="deep")
 df.set_index("Timestamp", inplace=True)
 df.index = pd.to_datetime(df.index, unit="s")
+df.info(memory_usage="deep")
 
-# ---------- load data (GPU) ----------
-# cudf does not support xz, so load from cpu dataframe
-gdf = cudf.DataFrame(df)
-gdf.info(memory_usage="deep")
+# ---------- create pct and log returns ----------
+# note: pct_change and division by a shifted value are equivalent.
+df["returns_pct"] = df["Close"].pct_change().fillna(0)
+df["returns_pct"] = (df["Close"] / df["Close"].shift(1) - 1).fillna(0)
+df["returns_log"] = np.log(df["Close"]).diff().fillna(0)
 
 
 #%% ==================== Buy-and-Hold Backtest ====================
@@ -45,17 +46,9 @@ gdf.info(memory_usage="deep")
 # one scalar, delivering an absolutely massive wall-clock speed-up.
 # note: cudf has a bit of an overhead over just cupy.
 
-
 # ---------- prepare data ----------
-# note: pct_change and division by a shifted value are equivalent.
-df["returns"    ]   = df["Close"].pct_change().fillna(0)
-df["returns"    ]   = (df["Close"] / df["Close"].shift(1) - 1).fillna(0)
-df["returns_log"]   = np.log(df["Close"]).diff().fillna(0)
-
-
 df1  = df.copy()
 gdf1 = cudf.from_pandas(df1)
-
 
 # -------------------- SOLUTION: Full Time Series --------------------
 # Multiple solutions to generate the full equity curve of cumulative returns.
@@ -63,13 +56,13 @@ gdf1 = cudf.from_pandas(df1)
 # 1: naive loop
 def longbtc_cpu_loop():
     growth = [1.0]
-    for R in df1["returns"]:
+    for R in df1["returns_pct"]:
         growth.append(growth[-1] * (1 + R))
     return pd.Series(growth[1:], index=df1.index) - 1
 
 # 2. vectorized pandas (cumulative product)
 def longbtc_cpu_cumprod():
-    return_cum = (1 + df1["returns"]).cumprod() - 1
+    return_cum = (1 + df1["returns_pct"]).cumprod() - 1
     return return_cum
 
 # 3. vectorized pandas (logarithmic sum)
@@ -79,7 +72,7 @@ def longbtc_cpu_log_cumsum():
 
 # 4. vectorized cudf (cumulative product)
 def longbtc_gpu_cumprod():
-    return_cum = (1 + gdf1["returns"]).cumprod() - 1
+    return_cum = (1 + gdf1["returns_pct"]).cumprod() - 1
     return return_cum
 
 # 5. vectorized cudf (logarithmic sum)
@@ -152,6 +145,7 @@ print(
 #%% ==================== Plotting ====================
 
 def plot_returns(df: pd.DataFrame, title: str):
+    raise NotImplementedError()
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.plot(df.index, df["return_cum"], label="Cumulative Return")
     ax.set_title(title)
@@ -258,7 +252,7 @@ def backtest_vectorized(df: pd.DataFrame) -> pd.DataFrame:
     """vectorised back test, using pandas (CPU)"""
     xfee = 0.0                       # fees disabled for now
     # per-bar P&L
-    df["strategy_returns"] = df["target"].shift(1).fillna(0) * df["returns"]
+    df["strategy_returns"] = df["target"].shift(1).fillna(0) * df["returns_pct"]
 
     # trades (0 → 1 or 1 → 0) for future fee logic
     # df["trade"] = df["target"].diff().abs().fillna(0)
@@ -276,7 +270,7 @@ def backtest_cudf(df: cudf.DataFrame) -> cudf.DataFrame:
     """vectorised back test, using cudf (GPU)"""
     xfee = 0.0                       # fees disabled for now
     # per-bar P&L
-    df["strategy_returns"] = df["target"].shift(1).fillna(0) * df["returns"]
+    df["strategy_returns"] = df["target"].shift(1).fillna(0) * df["returns_pct"]
 
     # trades (0 → 1 or 1 → 0) for future fee logic
     # df["trade"] = df["target"].diff().abs().fillna(0)
@@ -299,7 +293,6 @@ def backtest_cudf_ulti(df: cudf.DataFrame) -> cudf.DataFrame:
 # TODO: switch to pure integer window sizes?
 df["sma_2d"]  = df["Close"].rolling(window='2d').mean()
 df["sma_10d"] = df["Close"].rolling(window='10d').mean()
-df["returns"] = df["Close"].pct_change()
 
 # ---------- trim the NaN values ----------
 # trim the first 30 days to assure smas are fully 
