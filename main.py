@@ -293,20 +293,17 @@ def backtest_cudf_ulti(df: cudf.DataFrame) -> cudf.DataFrame:
 # TODO: switch to pure integer window sizes?
 df["sma_2d"]  = df["Close"].rolling(window='2d').mean()
 df["sma_10d"] = df["Close"].rolling(window='10d').mean()
-
-# ---------- trim the NaN values ----------
-# trim the first 30 days to assure smas are fully 
-# populated, and no NaNs
+# trim to remove incomplete SMA values and/or NaNs
 df1 = df.loc["2017-02-01":].copy()
 
-# ---------- run the strategy ----------
+# ---------- compute the strategy ----------
 # `target` is 1 for long, 0 for flat, and denotes the desired position
 # `signal` is 1 for buy, -1 for sell, and denotes the action needed
 # CRITICAL: shift down by 1 to eliminate lookahead bias
 df1["target"] = (df1['sma_2d'] > df1['sma_10d']).astype(int).shift(1).fillna(0)
 df1["signal"] = df1["target"].diff().fillna(0)
 
-df1.head()
+df1.head(10)
 
 
 #%% ==================== Run the backtests ====================
@@ -362,3 +359,5 @@ print(f"Max speedup: {naive_time / cudf_time:.3f}x\n\n")
 #%% ==================== Find a winning strategy? ====================
 
 # TODO: test across 10000s of strategies?
+
+# %%
