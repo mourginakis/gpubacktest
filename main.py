@@ -309,19 +309,22 @@ df1["signal"] = df1["target"].diff().fillna(0)
 df1.head(10)
 
 
-#%% ==================== Run the backtests ====================
+#%% ==================== Check Correctness ====================
+gdf1 = cudf.DataFrame.from_pandas(df1)
 
-results_vectorized = backtest_vectorized(df1)
-print(f"Vectorized Backtest Final Equity: {results_vectorized['equity'].iloc[-1]:.2f}")
+result1 = backtest_naive(df1)
+result2 = backtest_vectorized(df1)
+result3 = backtest_cudf(gdf1)
 
-results_naive = backtest_naive(df1)
-print(f"Naive Backtest Final Equity: {results_naive['equity'].iloc[-1]:.2f}")
+result1 = result1["equity"].iloc[-1]
+result2 = result2["equity"].iloc[-1]
+result3 = result3["equity"].iloc[-1]
 
-df2 = cudf.DataFrame.from_pandas(df1)
-results_cudf = backtest_cudf(df2)
-print(f"cuDF Backtest Final Equity: {results_cudf['equity'].iloc[-1]:.2f}")
+# all should equal: 5865.51 tested with 0.000 fee.
+print(f"Loop      |  vectorized |   cudf  \n"
+      f"{result1:.3f} == {result2:.3f} == {result3:.3f}\n\n")
 
-# all should equal: 5865.51 with 0.000 fee.
+assert np.allclose([result1, result2], result3), "mismatch in equity results"
 
 
 #%% ==================== Benchmark Speed ====================
@@ -338,7 +341,7 @@ def benchmark_vectorized():
     backtest_vectorized(df1)
 
 def benchmark_cudf():
-    backtest_cudf(df2)
+    backtest_cudf(gdf1)
 
 
 naive_time        = timeit(benchmark_naive, number=3)           / 3
