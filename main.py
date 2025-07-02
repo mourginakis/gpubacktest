@@ -290,11 +290,14 @@ def backtest_cudf_ulti(df: cudf.DataFrame) -> cudf.DataFrame:
 #%% ==================== SMA Backtest ====================
 
 # ---------- prepare data ----------
-# TODO: switch to pure integer window sizes?
-df["sma_2d"]  = df["Close"].rolling(window='2d').mean()
-df["sma_10d"] = df["Close"].rolling(window='10d').mean()
-# trim to remove incomplete SMA values and/or NaNs
+# also trim head to remove incomplete SMA values
+minutes_1d  = 24 * 60
+window_2d   = 2 * minutes_1d
+window_10d  = 10 * minutes_1d
+df["sma_2d"]  = df["Close"].rolling(window=window_2d, min_periods=window_2d).mean()
+df["sma_10d"] = df["Close"].rolling(window=window_10d, min_periods=window_10d).mean()
 df1 = df.loc["2017-02-01":].copy()
+assert df1.isna().sum().sum() == 0, "data error"
 
 # ---------- compute the strategy ----------
 # `target` is 1 for long, 0 for flat, and denotes the desired position
